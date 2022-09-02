@@ -182,7 +182,7 @@ def load_data(load_pathname):
 
         series = pyleo.Series(time=tso[time_num]['paleoData_values'],value=tso[val_num]['paleoData_values'],
                         time_name = tso[time_num]['paleoData_variableName'],value_name=tso[val_num]['paleoData_variableName'],
-                        time_unit = tso[time_num]['paleoData_units'], value_unit=tso[val_num]['paleoData_units']).standardize().convert_time_unit('yr BP')
+                        time_unit = tso[time_num]['paleoData_units'], value_unit=tso[val_num]['paleoData_units']).standardize().convert_time_unit('yr BP').interp(step=1)
 
         return series
 
@@ -190,7 +190,7 @@ def load_data(load_pathname):
         os.chdir(working_dir)
         return
 
-def visualize(series):
+def visualize(series,reverse=False,x_lims=None):
     '''Function to visualize data
 
     Parameters
@@ -199,11 +199,24 @@ def visualize(series):
     series : pyleoclim.series
         Series object from data loading step
 
+    reverse : bool; {True,False}
+        Whether or not to flip the y axis
+
+    x_lims : list, tuple
+        Limits for the x axis (in case zooming in is required)
+
     '''
+    series = series.convert_time_unit('yr BP')
     series = series.interp(step=1)
     fig = px.line(x=series.time, y=series.value, 
                     labels = {'x':f'{series.time_name} [{series.time_unit}]','y':f'{series.value_name} [{series.value_unit}]'}, 
                     title='Plot for labeling')
+
+    if reverse:
+        fig['layout']['yaxis']['autorange'] = "reversed"
+
+    if x_lims:
+        fig.update_layout(xaxis_range=[x_lims[0],x_lims[-1]])
 
     fig.show()
 
@@ -226,6 +239,8 @@ def label_data(series):
 
     breakpoints = ['start','first','second','third']
     available_time = series.time
+    start_time = min(available_time)
+    end_time = max(available_time)
 
     res ={}
 
@@ -237,10 +252,10 @@ def label_data(series):
 
             try:
                 timing = float(timing)
-                if available_time[0] <= timing <= available_time[-1]:
+                if start_time <= timing <= end_time:
                     valid=True
                 else:
-                    print(f'{timing} is not within series time range of [{available_time[0]},{available_time[-1]}].')
+                    print(f'{timing} is not within series time range of [{start_time},{end_time}].')
             except ValueError:
                 if not timing:
                     timing = None
@@ -253,7 +268,7 @@ def label_data(series):
     return res
 
 
-def gen_fit(series,res,v_shift = None):
+def gen_fit(series,res,reverse=False,x_lims=None,v_shift = None):
     '''Function to generate and check the fit of idealized shape as its been defined
 
     Parameters
@@ -265,6 +280,12 @@ def gen_fit(series,res,v_shift = None):
     res : dict
         Res object from data labeling step, or dict containing:
             event_start, event_end, beg_timing, beg_amp, mid_timing, mid_amp, end_timing, end_amp as keys
+
+    reverse : bool; {True,False}
+        Whether or not to flip the y axis
+    
+    x_lims : list, tuple
+        Limits for the x axis (in case zooming in is required)
 
     v_shift : float
         Amount to shift event up or down to assist with fitting. Optional
@@ -319,6 +340,12 @@ def gen_fit(series,res,v_shift = None):
 
     fig.add_scatter(x=interp_series.time, y=interp_series.value, name='Original Series')
     fig.add_scatter(x=synth_series.time, y = synth_series.value, name = 'Idealized Event Series')
+
+    if reverse:
+        fig['layout']['yaxis']['autorange'] = "reversed"
+
+    if x_lims:
+        fig.update_layout(xaxis_range=[x_lims[0],x_lims[-1]])
 
     fig.show()
 
